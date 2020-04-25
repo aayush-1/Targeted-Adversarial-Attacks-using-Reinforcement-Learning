@@ -5,28 +5,28 @@ import numpy as np
 import tensorflow as tf
 
 # Download the MNIST dataset
-dataset = datasets.fetch_mldata("MNIST Original")
+(x_train, y_train), (x_test, y_test)= tf.keras.datasets.mnist.load_data(path='mnist.npz')
+print(x_train.shape)
+print(x_test.shape)
+print(y_train.shape)
+print(y_test.shape)
+print(np.max(x_train))
 
-# Reshape the data to a (70000, 28, 28) tensor
-data = dataset.data.reshape((dataset.data.shape[0], 28, 28))
 
-# Reshape the data to a (70000, 28, 28, 1) tensord
-data = data[:, :, :, np.newaxis]
+x_train=x_train/255
+x_test=x_test/255
 
-# Scale values from range of [0-255] to [0-1]
-scaled_data = data / 255.0
+# # Reshape the data to a (70000, 28, 28, 1) tensord
+x_train = x_train[:, :, :, np.newaxis]
+x_test = x_test[:, :, :, np.newaxis]
 
-# Split the dataset into training and test sets
-(train_data, test_data, train_labels, test_labels) = train_test_split(
-    scaled_data,
-    dataset.target.astype("int"), 
-    test_size = 0.33)
+
 
 # Tranform training labels to one-hot encoding
-train_labels = np_utils.to_categorical(train_labels, 10)
+y_train = tf.keras.utils.to_categorical(y_train, 10)
 
 # Tranform test labels to one-hot encoding
-test_labels = np_utils.to_categorical(test_labels, 10)
+y_test = tf.keras.utils.to_categorical(y_test, 10)
 
 
 
@@ -47,9 +47,9 @@ model.compile(loss=tf.keras.losses.CategoricalCrossentropy(), optimizer=tf.keras
 
 
 # Train the model 
-model.fit(train_data,train_labels, batch_size = 128, epochs = 20, verbose = 1)
+model.fit(x_train,y_train, batch_size = 128, epochs = 20, verbose = 1)
 
 # Evaluate the model
-(loss, accuracy) = model.evaluate(test_data, test_labels, batch_size = 128, verbose = 1)
+(loss, accuracy) = model.evaluate(x_test, y_test, batch_size = 128, verbose = 1)
 
-print(accuracy)
+# print(accuracy)
