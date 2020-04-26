@@ -470,7 +470,7 @@ def fit(train_ds, epochs, test_ds,target_model):
 
     
     print("Epoch: ", epoch)
-    test_ds.shuffle()
+    test_ds.shuffle(BUFFER_SIZE)
     for input_image,t in test_ds.take(1):
       generate_images(generator, input_image,t,'train',epoch)
     # Train
