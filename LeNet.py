@@ -5,7 +5,7 @@ import numpy as np
 import tensorflow as tf
 
 # Download the MNIST dataset
-(x_train, y_train), (x_test, y_test)= tf.keras.datasets.mnist.load_data(path='mnist.npz')
+(x_train, y_train), (x_test, y_test)= tf.keras.datasets.mnist.load_data()
 print(x_train.shape)
 print(x_test.shape)
 print(y_train.shape)
@@ -29,16 +29,15 @@ y_train = tf.keras.utils.to_categorical(y_train, 10)
 y_test = tf.keras.utils.to_categorical(y_test, 10)
 
 
-
-model = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(filters = 20,kernel_size = (5, 5),padding = "same",input_shape = (28, 28, 1),activation="relu"),
-            tf.keras.layers.MaxPool2D(pool_size = (2, 2),strides =  (2, 2)),
-            tf.keras.layers.Conv2D(filters = 50,kernel_size = (5, 5),padding = "same",activation="relu"),
-            tf.keras.layers.MaxPool2D(pool_size = (2, 2),strides =  (2, 2)),
-            tf.keras.layers.Flatten(),
-            tf.keras.layers.Dense(500,activation='relu', kernel_initializer="he_uniform"),
-            tf.keras.layers.Dense(10,activation='softmax', kernel_initializer="he_uniform")
-            ])
+inputs=tf.keras.layers.Input(shape=[28,28,1])
+x=tf.keras.layers.Conv2D(filters = 20,kernel_size = (5, 5),padding = "same",input_shape = (28, 28, 1),activation="relu")(inputs)
+x=tf.keras.layers.MaxPool2D(pool_size = (2, 2),strides =  (2, 2))(x)
+x=tf.keras.layers.Conv2D(filters = 50,kernel_size = (5, 5),padding = "same",activation="relu")(x)
+x=tf.keras.layers.MaxPool2D(pool_size = (2, 2),strides =  (2, 2))(x)
+x=tf.keras.layers.Flatten()(x)
+x=tf.keras.layers.Dense(500,activation='relu', kernel_initializer="he_uniform")(x)
+x=tf.keras.layers.Dense(10,activation='softmax', kernel_initializer="he_uniform")(x)
+model=tf.keras.Model(inputs=inputs, outputs=x)
 model.compile(loss=tf.keras.losses.CategoricalCrossentropy(), optimizer=tf.keras.optimizers.SGD(learning_rate=0.01),metrics = ["accuracy"])
 
 
@@ -51,5 +50,5 @@ model.fit(x_train,y_train, batch_size = 128, epochs = 20, verbose = 1)
 
 # Evaluate the model
 (loss, accuracy) = model.evaluate(x_test, y_test, batch_size = 128, verbose = 1)
-
-# print(accuracy)
+model.save("model")
+print(accuracy)
