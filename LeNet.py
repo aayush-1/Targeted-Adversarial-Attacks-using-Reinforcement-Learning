@@ -30,9 +30,9 @@ y_test = tf.keras.utils.to_categorical(y_test, 10)
 
 
 inputs=tf.keras.layers.Input(shape=[28,28,1])
-x=tf.keras.layers.Conv2D(filters = 20,kernel_size = (5, 5),padding = "same",input_shape = (28, 28, 1),activation="relu")(inputs)
+x=tf.keras.layers.Conv2D(filters = 64,kernel_size = (5, 5),padding = "same",input_shape = (28, 28, 1),activation="relu")(inputs)
 x=tf.keras.layers.MaxPool2D(pool_size = (2, 2),strides =  (2, 2))(x)
-x=tf.keras.layers.Conv2D(filters = 50,kernel_size = (5, 5),padding = "same",activation="relu")(x)
+x=tf.keras.layers.Conv2D(filters = 128,kernel_size = (5, 5),padding = "same",activation="relu")(x)
 x=tf.keras.layers.MaxPool2D(pool_size = (2, 2),strides =  (2, 2))(x)
 x=tf.keras.layers.Flatten()(x)
 x=tf.keras.layers.Dense(500,activation='relu', kernel_initializer="he_uniform")(x)
