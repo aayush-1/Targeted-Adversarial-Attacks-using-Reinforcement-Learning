@@ -13,10 +13,6 @@ Trick Three: Target Policy Smoothing. TD3 adds noise to the target action, to ma
 
 OUTPUT_CHANNELS = 1
 
-DISCOUNT=0.99,
-TAU=0.005,
-POLICY_NOISE=0.2,
-NOISE_CLIP=0.5,
 POLICY_FREQ=2
 
 
@@ -107,32 +103,32 @@ actor_optimizer = tf.keras.optimizers.Adam(3e-4, beta_1=0.5)
 
 
 def Critic():
-    input1 = tf.keras.layers.Input(shape=[28,28,1])
-    input2 = tf.keras.layers.Input(shape=[28,28,1])
-    input3 = tf.keras.layers.Input(shape=[28,28,1])
-    x = tf.keras.layers.Concatenate([input1, input2, input3])
+  input1 = tf.keras.layers.Input(shape=[28,28,1])
+  input2 = tf.keras.layers.Input(shape=[28,28,1])
+  input3 = tf.keras.layers.Input(shape=[28,28,1])
+  x = tf.keras.layers.Concatenate([input1, input2, input3])
 
-    #Q1
-    q1 = keras.layers.Conv2D(64, (4, 4), strides=(2, 2), padding='same')(x)
-    q1 = keras.layers.ReLU()(q1)
-    q1 = keras.layers.Conv2D(128, (4, 4), strides=(2, 2), padding='same')(q1)
-    q1 = keras.layers.ReLU()(q1)#
-    q1 = keras.layers.Flatten()(q1)
-    q1 = keras.layers.Dense(512)(q1)
-    q1 = keras.layers.ReLU()(q1)
-    q1 = keras.layers.Dense(1)(q1)
+  #Q1
+  q1 = keras.layers.Conv2D(64, (4, 4), strides=(2, 2), padding='same')(x)
+  q1 = keras.layers.ReLU()(q1)
+  q1 = keras.layers.Conv2D(128, (4, 4), strides=(2, 2), padding='same')(q1)
+  q1 = keras.layers.ReLU()(q1)#
+  q1 = keras.layers.Flatten()(q1)
+  q1 = keras.layers.Dense(512)(q1)
+  q1 = keras.layers.ReLU()(q1)
+  q1 = keras.layers.Dense(1)(q1)
 
-    #q2
-    q2 = keras.layers.Conv2D(64, (4, 4), strides=(2, 2), padding='same')(x)
-    q2 = keras.layers.ReLU()(q2)
-    q2 = keras.layers.Conv2D(128, (4, 4), strides=(2, 2), padding='same')(q2)
-    q2 = keras.layers.ReLU()(q2)
-    q2 = keras.layers.Flatten()(q2)
-    q2 = keras.layers.Dense(512)(q2)
-    q1 = keras.layers.ReLU()(q1)
-    q2 = keras.layers.Dense(1)(q2)
+  #q2
+  q2 = keras.layers.Conv2D(64, (4, 4), strides=(2, 2), padding='same')(x)
+  q2 = keras.layers.ReLU()(q2)
+  q2 = keras.layers.Conv2D(128, (4, 4), strides=(2, 2), padding='same')(q2)
+  q2 = keras.layers.ReLU()(q2)
+  q2 = keras.layers.Flatten()(q2)
+  q2 = keras.layers.Dense(512)(q2)
+  q1 = keras.layers.ReLU()(q1)
+  q2 = keras.layers.Dense(1)(q2)
 
-    return tf.keras.Model(inputs=[input1, input2, input3], outputs=[q1, q2])
+  return tf.keras.Model(inputs=[input1, input2, input3], outputs=[q1, q2])
 	
 	
 
