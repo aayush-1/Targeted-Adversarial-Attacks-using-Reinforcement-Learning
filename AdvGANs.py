@@ -18,104 +18,9 @@ EPOCHS = 20
 
 
 
-# target_model= tf.keras.Sequential([
-#             tf.keras.layers.Conv2D(filters = 20,kernel_size = (5, 5),padding = "same",input_shape = (28, 28, 1),activation="relu"),
-#             tf.keras.layers.MaxPool2D(pool_size = (2, 2),strides =  (2, 2)),
-#             tf.keras.layers.Conv2D(filters = 50,kernel_size = (5, 5),padding = "same",activation="relu"),
-#             tf.keras.layers.MaxPool2D(pool_size = (2, 2),strides =  (2, 2)),
-#             tf.keras.layers.Flatten(),
-#             tf.keras.layers.Dense(500,activation='relu', kernel_initializer="he_uniform"),
-#             tf.keras.layers.Dense(10,activation='softmax', kernel_initializer="he_uniform")
-#             ])
-# target_model.compile(loss=tf.keras.losses.CategoricalCrossentropy(), optimizer=tf.keras.optimizers.SGD(learning_rate=0.01),metrics = ["accuracy"])
 
 target_model=tf.keras.models.load_model('target_model')
 
-
-# IMG_WIDTH = 256
-# IMG_HEIGHT = 256
-
-# def load(image_file):
-#   image = tf.io.read_file(image_file)
-#   image = tf.image.decode_jpeg(image)
-
-#   w = tf.shape(image)[1]
-
-#   w = w // 2
-#   real_image = image[:, :w, :]
-#   input_image = image[:, w:, :]
-
-#   input_image = tf.cast(input_image, tf.float32)
-#   real_image = tf.cast(real_image, tf.float32)
-
-#   return input_image, real_image
-
-# inp, re = load(PATH+'train/100.jpg')
-# # casting to int for matplotlib to show the image
-# plt.figure()
-# plt.imshow(inp/255.0)
-# plt.figure()
-# plt.imshow(re/255.0)
-
-# def resize(input_image, real_image, height, width):
-#   input_image = tf.image.resize(input_image, [height, width],
-#                                 method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-#   real_image = tf.image.resize(real_image, [height, width],
-#                                method=tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-
-#   return input_image, real_image
-
-# def random_crop(input_image, real_image):
-#   stacked_image = tf.stack([input_image, real_image], axis=0)
-#   cropped_image = tf.image.random_crop(
-#       stacked_image, size=[2, IMG_HEIGHT, IMG_WIDTH, 3])
-
-#   return cropped_image[0], cropped_image[1]
-
-
-# def normalize(input_image, real_image):
-#   input_image = (input_image / 127.5) - 1
-#   real_image = (real_image / 127.5) - 1
-
-#   return input_image, real_image
-
-# @tf.function()
-# def random_jitter(input_image, real_image):
-#   # resizing to 286 x 286 x 3
-#   input_image, real_image = resize(input_image, real_image, 286, 286)
-
-#   # randomly cropping to 256 x 256 x 3
-#   input_image, real_image = random_crop(input_image, real_image)
-
-#   if tf.random.uniform(()) > 0.5:
-#     # random mirroring
-#     input_image = tf.image.flip_left_right(input_image)
-#     real_image = tf.image.flip_left_right(real_image)
-
-#   return input_image, real_image
-
-# plt.figure(figsize=(6, 6))
-# for i in range(4):
-#   rj_inp, rj_re = random_jitter(inp, re)
-#   plt.subplot(2, 2, i+1)
-#   plt.imshow(rj_inp/255.0)
-#   plt.axis('off')
-# plt.show()
-
-# def load_image_train(image_file):
-#   input_image, real_image = load(image_file)
-#   # input_image, real_image = random_jitter(input_image, real_image)
-#   input_image, real_image = normalize(input_image, real_image)
-
-#   return input_image, real_image
-
-# def load_image_test(image_file):
-#   input_image, real_image = load(image_file)
-#   input_image, real_image = resize(input_image, real_image,
-#                                    IMG_HEIGHT, IMG_WIDTH)
-#   input_image, real_image = normalize(input_image, real_image)
-
-#   return input_image, real_image
 
 (train_dataset, train_labels), (test_dataset, test_labels) = tf.keras.datasets.mnist.load_data()
 
@@ -128,8 +33,6 @@ train_labels = tf.keras.utils.to_categorical(train_labels, 10)
 train_dataset=tf.data.Dataset.from_tensor_slices((train_dataset,train_labels))
 train_dataset = train_dataset.batch(BATCH_SIZE)
 
-# test_dataset = tf.data.Dataset.list_files(PATH+'test/*.jpg')
-# test_dataset = test_dataset.map(load_image_test)
 
 test_dataset = test_dataset.reshape(test_dataset.shape[0], 28, 28, 1).astype('float32')
 test_dataset = (test_dataset - 127.5) / 127.5
@@ -140,10 +43,6 @@ test_labels = tf.keras.utils.to_categorical(test_labels, 10)
 test_dataset=tf.data.Dataset.from_tensor_slices((test_dataset,test_labels))
 # test_dataset = test_dataset.batch(BATCH_SIZE)
 
-
-# print(train_dataset[1])
-
-# print(test_dataset)
 """## Build the Generator
   * The architecture of generator is a modified U-Net.
   * Each block in the encoder is (Conv -> Batchnorm -> Leaky ReLU)
@@ -433,10 +332,10 @@ def train_step(dataset, epoch,target_model):
     # (loss, accuracy)=target_model.evaluate(gen_output, t, batch_size = 128, verbose = 1,steps=1)
     correct_prediction = tf.math.equal(tf.math.argmax(pred, 1), tf.math.argmax(t, 1))
     accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float"))
-
+    tf.print("TRAIN Accuracy- ",accuracy)
     gen_total_loss, gen_gan_loss, gen_l1_loss,l_adv = generator_loss(disc_generated_output, gen_output, input_image,pred,t)
     disc_loss = discriminator_loss(disc_real_output, disc_generated_output)
-  print("TRAIN Accuracy- ",accuracy)
+  
   generator_gradients = gen_tape.gradient(gen_total_loss,
                                           generator.trainable_variables)
   discriminator_gradients = disc_tape.gradient(disc_loss,
@@ -448,11 +347,6 @@ def train_step(dataset, epoch,target_model):
                                               discriminator.trainable_variables))
 
 
-  # with summary_writer.as_default():
-  #   tf.summary.scalar('gen_total_loss', gen_total_loss, step=epoch)
-  #   tf.summary.scalar('gen_gan_loss', gen_gan_loss, step=epoch)
-  #   tf.summary.scalar('gen_l1_loss', gen_l1_loss, step=epoch)
-  #   tf.summary.scalar('disc_loss', disc_loss, step=epoch)
 
 """The actual training loop:
 
@@ -495,18 +389,6 @@ def fit(train_ds, epochs, test_ds,target_model):
   checkpoint.save(file_prefix = checkpoint_prefix)
 
 
-
-"""This training loop saves logs you can easily view in TensorBoard to monitor the training progress. Working locally you would launch a separate tensorboard process. In a notebook, if you want to monitor with TensorBoard it's easiest to launch the viewer before starting the training.
-
-To launch the viewer paste the following into a code-cell:
-"""
-
-# Commented out IPython magic to ensure Python compatibility.
-#docs_infra: no_execute
-# %load_ext tensorboard
-# %tensorboard --logdir {log_dir}
-
-"""Now run the training loop:"""
 
 fit(train_dataset, EPOCHS, test_dataset,target_model)
 
