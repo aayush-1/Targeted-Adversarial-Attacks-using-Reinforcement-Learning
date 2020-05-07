@@ -18,7 +18,7 @@ BATCH_SIZE = 40
 LAMBDA = 100
 X=0
 
-EPOCHS = 2
+EPOCHS = 3
 
 MEMORY = deque(maxlen=10000)
 
