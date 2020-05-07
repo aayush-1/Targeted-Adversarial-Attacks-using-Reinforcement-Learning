@@ -18,7 +18,7 @@ BATCH_SIZE = 40
 LAMBDA = 100
 X=0
 
-EPOCHS = 40
+EPOCHS = 2
 
 MEMORY = deque(maxlen=10000)
 
@@ -49,6 +49,7 @@ test_dataset=tf.data.Dataset.from_tensor_slices((test_dataset,test_labels))
 
 target_images=np.load("label.npy")
 target_label = np.arange(10)
+target_label=np.float32(target_label)
 
 for i in range(2):
     target_images=np.vstack((target_images,target_images))
@@ -57,7 +58,7 @@ for i in range(2):
 perm=np.random.permutation(target_images.shape[0])
 target_images=target_images[perm]
 target_label=target_label[perm]
-
+target_label = tf.keras.utils.to_categorical(target_label, 10)
 target_dataset=tf.data.Dataset.from_tensor_slices((target_images,target_label))
 target_dataset = target_dataset.batch(BATCH_SIZE)
 
@@ -127,7 +128,7 @@ def Actor():
         kernel_initializer=initializer,
         activation='tanh')
 	
-	x = tf.keras.layers.Concatenate([input_image,label_image])
+	x = tf.keras.layers.Concatenate()([input_image,label_image])
 	for down in down_stack:
 		x = down(x)
 		
@@ -164,13 +165,13 @@ def Critic():
   input1 = tf.keras.layers.Input(shape=[28,28,1])
   input2 = tf.keras.layers.Input(shape=[28,28,1])
   input3 = tf.keras.layers.Input(shape=[28,28,1])
-  x = tf.keras.layers.Concatenate([input1, input2, input3])
+  x = tf.keras.layers.Concatenate()([input1, input2, input3])
 
   #Q1
   q1 = tf.keras.layers.Conv2D(64, (4, 4), strides=(2, 2), padding='same')(x)
   q1 = tf.keras.layers.ReLU()(q1)
   q1 = tf.keras.layers.Conv2D(128, (4, 4), strides=(2, 2), padding='same')(q1)
-  q1 = tf.keras.layers.ReLU()(q1)#
+  q1 = tf.keras.layers.ReLU()(q1)
   q1 = tf.keras.layers.Flatten()(q1)
   q1 = tf.keras.layers.Dense(512)(q1)
   q1 = tf.keras.layers.ReLU()(q1)
@@ -183,7 +184,7 @@ def Critic():
   q2 = tf.keras.layers.ReLU()(q2)
   q2 = tf.keras.layers.Flatten()(q2)
   q2 = tf.keras.layers.Dense(512)(q2)
-  q1 = tf.keras.layers.ReLU()(q1)
+  q2 = tf.keras.layers.ReLU()(q2)
   q2 = tf.keras.layers.Dense(1)(q2)
 
   return tf.keras.Model(inputs=[input1, input2, input3], outputs=[q1, q2])
@@ -195,11 +196,11 @@ def Critic():
 critic = Critic()
 tf.keras.utils.plot_model(critic, to_file='critic.png',show_shapes=True, dpi=64)
 
-loss_object = tf.keras.losses.MeanSquaredError()
 
+loss_object_2 = tf.keras.losses.MeanSquaredError()
 
 def Critic_loss(reward, current_Q1, current_Q2):
-    return loss_object(current_Q1, reward) + loss_object(current_Q2, reward) 
+    return loss_object_2(current_Q1, reward) + loss_object_2(current_Q2, reward) 
 
 
 critic_optimizer = tf.keras.optimizers.Adam(3e-4, beta_1=0.5)
@@ -269,23 +270,24 @@ tf.keras.utils.plot_model(generator, to_file='generator.png',show_shapes=True, d
 
 
 def adv_loss(preds, labels, is_targeted):
-	real = tf.math.reduce_sum(labels * preds, 1)
-	other = tf.math.reduce_max((1 - labels) * preds - (labels * 10000), 1)
-	if is_targeted:
-		return tf.math.reduce_sum(tf.math.maximum(0.0, other - real))
-	return tf.math.reduce_sum(tf.maximum(0.0, real - other))
+    real = tf.math.reduce_sum(labels * preds, 1)
+    other = tf.math.reduce_max((1 - labels) * preds - (labels * 10000), 1)
+    if is_targeted:
+        return tf.math.reduce_sum(tf.math.maximum(0.0, other - real)),tf.math.maximum(tf.zeros_like(other-real,dtype=tf.float32), other - real)
+    return tf.math.reduce_sum(tf.maximum(0.0, real - other)),tf.math.maximum(tf.zeros_like(other-real,dtype=tf.float32), real-other)
 
 
 def generator_loss(disc_generated_output, gen_output, target,pred,label):
   gan_loss = loss_object(tf.ones_like(disc_generated_output), disc_generated_output)
-
+  gan_loss_1 = loss_object_1(tf.ones_like(disc_generated_output), disc_generated_output)
   # mean absolute error
   l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
-  l_adv = adv_loss(pred,label,False)
+  l1_loss_1 = tf.keras.backend.mean(tf.abs(target - gen_output),axis=[1,2,3])
+  l_adv, l_adv_1 = adv_loss(pred,label,True)
   total_gan_loss = l_adv + gan_loss + (LAMBDA * l1_loss)
-  
+  total_gan_loss_1 = l_adv_1 + gan_loss_1 + (LAMBDA * l1_loss_1)
 
-  return total_gan_loss, gan_loss, l1_loss,l_adv
+  return total_gan_loss, total_gan_loss_1, gan_loss, l1_loss,l_adv
 
 #********************************************************************************************
 
@@ -314,6 +316,7 @@ tf.keras.utils.plot_model(discriminator, to_file='disriminator.png',show_shapes=
 
 
 loss_object = tf.keras.losses.BinaryCrossentropy(from_logits=True)
+loss_object_1 = tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction = tf.keras.losses.Reduction.NONE)
 
 def discriminator_loss(disc_real_output, disc_generated_output):
   real_loss = loss_object(tf.ones_like(disc_real_output), disc_real_output)
@@ -347,8 +350,15 @@ checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
 
 
 def generate_images(model,test_input,t,a,b):
+
+  A=np.random.randint(40)
+  target = target_images[A]
   test_input=tf.reshape(test_input,[1,28,28,1])
-  prediction = model(test_input, training=True)
+  target=tf.reshape(target,[1,28,28,1])
+  label_t = np.argmax(target_label[A])
+  action = actor([test_input,target])
+
+  prediction = model(action, training=True)
   pred_fake=np.argmax(target_model.predict(prediction))
   pred_orig=np.argmax(target_model.predict(test_input))
   t=np.argmax(t)
@@ -357,11 +367,11 @@ def generate_images(model,test_input,t,a,b):
   # pred=target_model.predict(prediction)
   # (loss, accuracy)=target_model.evaluate(prediction, t, batch_size = 128, verbose = 1)
   plt.figure(figsize=(15,15))
-  display_list = [test_input, prediction]
-  title = ['Input Image - ' + str(t)+' Predicted Original -'+str(pred_orig)  , 'Predicted Image - '+ str(pred_fake)]
+  display_list = [test_input, prediction, target]
+  title = ['Input Image - ' + str(t)+' Predicted Original -'+str(pred_orig)  , 'Predicted Image - '+ str(pred_fake), ' Target Prediction - '+str(label_t)]
   # print("TEST Accuracy- ",accuracy)
-  for i in range(2):
-    plt.subplot(1, 2, i+1)
+  for i in range(3):
+    plt.subplot(1, 3, i+1)
     plt.title(title[i])
     # getting the pixel values between [0, 1] to plot it.
     plt.imshow(tf.reshape(display_list[i],[28,28]) * 0.5 + 0.5)
@@ -381,15 +391,15 @@ summary_writer = tf.summary.create_file_writer(
 
 @tf.function
 def train_step(dataset, target,epoch,target_model):
-  for target_image , target_label in target:
+  for target_image , target_label in target.take(1):
     input_image=dataset[0]
     t=dataset[1]
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape, tf.GradientTape() as actor_tape, tf.GradientTape() as critic_tape:
         # find action using actor
         action = actor([input_image,target_image])
-        action_modified = action + tf.random.normal(0,0.1)
+        action_modified = action + tf.random.normal([BATCH_SIZE,28,28,1],0,0.1)
         # input the action to generator
-        gen_output = generator(action, training=True)
+        gen_output = generator(action_modified, training=True)
 
         disc_real_output = discriminator(input_image, training=True)
         disc_generated_output = discriminator( gen_output, training=True)
@@ -401,11 +411,11 @@ def train_step(dataset, target,epoch,target_model):
         correct_prediction = tf.math.equal(tf.math.argmax(pred, 1), tf.math.argmax(t, 1))
         accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float"))
         tf.print("TRAIN Accuracy- ",accuracy)
-        gen_total_loss, gen_gan_loss, gen_l1_loss,l_adv = generator_loss(disc_generated_output, gen_output, input_image,pred,t)
+        gen_total_loss, gen_total_loss_1, gen_gan_loss, gen_l1_loss,l_adv = generator_loss(disc_generated_output, gen_output, input_image,pred,target_label)
         disc_loss = discriminator_loss(disc_real_output, disc_generated_output)
         Q1,Q2 = critic([input_image,target_image,action]) 
         # find the reward to update the RL agent.
-        reward = 
+        reward = -gen_total_loss_1
         # find actor loss
         actor_loss = Actor_loss(Q1)
         # find critic loss
@@ -457,7 +467,7 @@ def fit(train_ds, target_ds, epochs, test_ds,target_model):
                                                         time.time()-start))
   checkpoint.save(file_prefix = checkpoint_prefix)
 
-checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
+checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir)).expect_partial()
 
 fit(train_dataset, target_dataset, EPOCHS, test_dataset,target_model)
 
@@ -470,3 +480,15 @@ checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 for input_image,t in test_dataset.take(100):
 	generate_images(generator, input_image,t,'test',X)
 	X+=1
+
+
+
+# test_dataset = test_dataset.batch(10000)
+# for dataset in test_dataset:
+#   data=dataset[0]
+#   t=dataset[1]
+#   gen_output = generator(data, training=True)
+#   pred=target_model.predict(gen_output)
+#   correct_prediction = np.equal(np.argmax(pred, 1), np.argmax(t, 1))
+#   accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float"))
+#   tf.print("acc:- ",accuracy)
