@@ -1,6 +1,5 @@
-#Check RL loss for a batch of batch_size
-
-
+#watch action in generate images as well
+#increase batch siz and diverse target input
 
 import tensorflow as tf
 import os
@@ -18,7 +17,7 @@ BATCH_SIZE = 40
 LAMBDA = 100
 X=0
 
-EPOCHS = 3
+EPOCHS = 2
 
 MEMORY = deque(maxlen=10000)
 
@@ -409,7 +408,7 @@ def train_step(dataset, target,epoch,target_model):
         
         
         correct_prediction = tf.math.equal(tf.math.argmax(pred, 1), tf.math.argmax(t, 1))
-        accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float"))
+        accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float32"))
         tf.print("TRAIN Accuracy- ",accuracy)
         gen_total_loss, gen_total_loss_1, gen_gan_loss, gen_l1_loss,l_adv = generator_loss(disc_generated_output, gen_output, input_image,pred,target_label)
         disc_loss = discriminator_loss(disc_real_output, disc_generated_output)
@@ -460,7 +459,7 @@ def fit(train_ds, target_ds, epochs, test_ds,target_model):
 
     
     # saving (checkpoint) the model every 20 epochs
-    if (epoch + 1) % 20 == 0:
+    if (epoch + 1) % 2 == 0:
       checkpoint.save(file_prefix = checkpoint_prefix)
 
     print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1,
