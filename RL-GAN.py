@@ -1,6 +1,3 @@
-#watch action in generate images as well
-#increase batch siz and diverse target input
-
 import tensorflow as tf
 import os
 import time
@@ -17,19 +14,19 @@ BATCH_SIZE = 40
 LAMBDA = 100
 X=0
 
-EPOCHS = 2
+EPOCHS = 10
 
 MEMORY = deque(maxlen=10000)
 
 
-target_model=tf.keras.models.load_model('target_model')
+target_model=tf.keras.models.load_model('./MAIN/target_model')
 
 
 (train_dataset, train_labels), (test_dataset, test_labels) = tf.keras.datasets.mnist.load_data()
 
 train_dataset = train_dataset.reshape(train_dataset.shape[0], 28, 28, 1).astype('float32')
 train_dataset = (train_dataset - 127.5) / 127.5
-perm=np.random.permutation(train_dataset.shape[0])
+perm=np.random.permutation(train_dataset.shape[0])                                                                                                                                                                                                  
 train_dataset=train_dataset[perm]
 train_labels=train_labels[perm]
 train_labels = tf.keras.utils.to_categorical(train_labels, 10)
@@ -334,8 +331,8 @@ discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
 
 
-
-checkpoint_dir = './training_checkpoints'
+gan_checkpoint = './MAIN/AdvGANs_checkpoint/'
+checkpoint_dir = './MAIN/RL_training_checkpoints/E' + str(EPOCHS) + 'B' + str(BATCH_SIZE)
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                  discriminator_optimizer=discriminator_optimizer,
@@ -349,7 +346,8 @@ checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
 
 
 def generate_images(model,test_input,t,a,b):
-
+  images_dir = './MAIN/output images/E' + str(EPOCHS) + 'B' + str(BATCH_SIZE)
+  os.makedirs(images_dir, exist_ok=True)
   A=np.random.randint(40)
   target = target_images[A]
   test_input=tf.reshape(test_input,[1,28,28,1])
@@ -375,10 +373,11 @@ def generate_images(model,test_input,t,a,b):
     # getting the pixel values between [0, 1] to plot it.
     plt.imshow(tf.reshape(display_list[i],[28,28]) * 0.5 + 0.5)
     plt.axis('off')
-  if(a=='train'):
-    plt.savefig('output_images/train_'+str(b)+'.png')
-  elif(a=='test'):
-    plt.savefig('output_images/test_'+str(b)+'.png')
+    
+    if(a=='train'):
+      plt.savefig(images_dir + '/train_'+str(b)+'.png')
+    elif(a=='test'):
+      plt.savefig(images_dir + '/test_'+str(b)+'.png')
 
 
 
@@ -407,7 +406,7 @@ def train_step(dataset, target,epoch,target_model):
             pred = layer(pred)
         
         
-        correct_prediction = tf.math.equal(tf.math.argmax(pred, 1), tf.math.argmax(t, 1))
+        correct_prediction = tf.math.equal(tf.math.argmax(pred, 1), tf.math.argmax(target_label, 1))
         accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float32"))
         tf.print("TRAIN Accuracy- ",accuracy)
         gen_total_loss, gen_total_loss_1, gen_gan_loss, gen_l1_loss,l_adv = generator_loss(disc_generated_output, gen_output, input_image,pred,target_label)
@@ -458,7 +457,7 @@ def fit(train_ds, target_ds, epochs, test_ds,target_model):
     print()
 
     
-    # saving (checkpoint) the model every 20 epochs
+    # saving (checkpoint) the model every 2 epochs
     if (epoch + 1) % 2 == 0:
       checkpoint.save(file_prefix = checkpoint_prefix)
 
@@ -466,28 +465,31 @@ def fit(train_ds, target_ds, epochs, test_ds,target_model):
                                                         time.time()-start))
   checkpoint.save(file_prefix = checkpoint_prefix)
 
-checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir)).expect_partial()
+checkpoint.restore(tf.train.latest_checkpoint(gan_checkpoint)).expect_partial()
 
 fit(train_dataset, target_dataset, EPOCHS, test_dataset,target_model)
 
 # restoring the latest checkpoint in checkpoint_dir
 checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
-"""## Generate using test dataset"""
+# """## Generate using test dataset"""
 
-# Run the trained model on a few examples from the test dataset
+# # Run the trained model on a few examples from the test dataset
 for input_image,t in test_dataset.take(100):
 	generate_images(generator, input_image,t,'test',X)
 	X+=1
 
-
-
-# test_dataset = test_dataset.batch(10000)
-# for dataset in test_dataset:
-#   data=dataset[0]
-#   t=dataset[1]
-#   gen_output = generator(data, training=True)
-#   pred=target_model.predict(gen_output)
-#   correct_prediction = np.equal(np.argmax(pred, 1), np.argmax(t, 1))
-#   accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float"))
-#   tf.print("acc:- ",accuracy)
+test_dataset = test_dataset.batch(40)
+acc=0
+for dataset in test_dataset.take(100):
+  for target , t_target in target_dataset:
+    data=dataset[0]
+    t=dataset[1]
+    action=actor([data,target])
+    gen_output = generator(action, training=True)
+    pred=target_model.predict(gen_output)
+    correct_prediction = np.equal(np.argmax(pred, 1), np.argmax(t_target, 1))
+    accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float64"))
+    acc+=accuracy
+    tf.print("Accuracy: ",accuracy)
+tf.print("Mean Accuracy: ",acc/100)
