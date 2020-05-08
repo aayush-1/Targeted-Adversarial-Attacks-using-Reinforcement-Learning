@@ -195,11 +195,11 @@ def Critic():
 critic = Critic()
 tf.keras.utils.plot_model(critic, to_file='critic.png',show_shapes=True, dpi=64)
 
-loss_object = tf.keras.losses.MeanSquaredError()
+loss_object1 = tf.keras.losses.MeanSquaredError()
 
 
 def Critic_loss(reward, current_Q1, current_Q2):
-    return loss_object(current_Q1, reward) + loss_object(current_Q2, reward) 
+    return loss_object1(current_Q1, reward) + loss_object(current_Q2, reward) 
 
 
 critic_optimizer = tf.keras.optimizers.Adam(3e-4, beta_1=0.5)
@@ -277,11 +277,12 @@ def adv_loss(preds, labels, is_targeted):
 
 
 def generator_loss(disc_generated_output, gen_output, target,pred,label):
-  gan_loss = loss_object(tf.ones_like(disc_generated_output), disc_generated_output)
+  gan_loss = loss_object(tf.ones_like(disc_generated_output), disc_generated_output, reduction=None)
 
   # mean absolute error
-  l1_loss = tf.reduce_mean(tf.abs(target - gen_output))
-  l_adv = adv_loss(pred,label,False)
+  l1_loss = tf.mean(tf.abs(target - gen_output))
+  #Change ADV Loss
+  l_adv = adv_loss(pred,label,True)
   total_gan_loss = l_adv + gan_loss + (LAMBDA * l1_loss)
   
 
@@ -381,7 +382,7 @@ summary_writer = tf.summary.create_file_writer(
 
 @tf.function
 def train_step(dataset, target,epoch,target_model):
-  for target_image , target_label in target:
+  for target_image , target_label in target.take(1):
     input_image=dataset[0]
     t=dataset[1]
     with tf.GradientTape() as gen_tape, tf.GradientTape() as disc_tape, tf.GradientTape() as actor_tape, tf.GradientTape() as critic_tape:
@@ -401,11 +402,11 @@ def train_step(dataset, target,epoch,target_model):
         correct_prediction = tf.math.equal(tf.math.argmax(pred, 1), tf.math.argmax(t, 1))
         accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float"))
         tf.print("TRAIN Accuracy- ",accuracy)
-        gen_total_loss, gen_gan_loss, gen_l1_loss,l_adv = generator_loss(disc_generated_output, gen_output, input_image,pred,t)
+        gen_total_loss, gen_gan_loss, gen_l1_loss,l_adv = generator_loss(disc_generated_output, gen_output, input_image,pred,target_label)
         disc_loss = discriminator_loss(disc_real_output, disc_generated_output)
         Q1,Q2 = critic([input_image,target_image,action]) 
         # find the reward to update the RL agent.
-        reward = 
+        reward = -gen_total_loss
         # find actor loss
         actor_loss = Actor_loss(Q1)
         # find critic loss
