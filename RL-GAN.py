@@ -394,7 +394,7 @@ summary_writer = tf.summary.create_file_writer(
 def Accuracy():
 	test_dataset_1 = test_dataset.batch(BATCH_SIZE)
 	acc=0
-	for dataset in test_dataset1.take(10000/BATCH_SIZE):
+	for dataset in test_dataset_1.take(250):
 	  for target , t_target in target_dataset:
 	    data=dataset[0]
 	    t=dataset[1]
@@ -404,7 +404,7 @@ def Accuracy():
 	    correct_prediction = np.equal(np.argmax(pred, 1), np.argmax(t_target, 1))
 	    accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float64"))
 	    acc+=accuracy
-	    tf.print("Accuracy: ",accuracy)
+	    # tf.print("Accuracy: ",accuracy)
 	tf.print("Mean Accuracy: ",(acc/10000)*BATCH_SIZE)
 
 
@@ -469,6 +469,7 @@ def fit(train_ds, target_ds, epochs, test_ds,target_model):
       generate_images(generator, input_image,t,'train',epoch)
     # Train
     n=0
+    
     for  dataset in train_ds:
       # print(dataset)
       print('.', end='')
