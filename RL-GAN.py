@@ -10,16 +10,16 @@ from collections import deque
 
 
 BUFFER_SIZE = 60000
-BATCH_SIZE = 40
+BATCH_SIZE = 40                                                         # change it to 20
 LAMBDA = 100
 X=0
 
-EPOCHS = 10
+EPOCHS = 3
 
 MEMORY = deque(maxlen=10000)
 
 
-target_model=tf.keras.models.load_model('./MAIN/target_model')
+target_model=tf.keras.models.load_model('MNIST/target_model')
 
 
 (train_dataset, train_labels), (test_dataset, test_labels) = tf.keras.datasets.mnist.load_data()
@@ -47,7 +47,7 @@ target_images=np.load("label.npy")
 target_label = np.arange(10)
 target_label=np.float32(target_label)
 
-for i in range(2):
+for i in range(2):                                                                  # change it to one for 20 sized dataset
     target_images=np.vstack((target_images,target_images))
     target_label=np.hstack((target_label,target_label))
 
@@ -331,8 +331,8 @@ discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
 
 
-gan_checkpoint = './MAIN/AdvGANs_checkpoint/'
-checkpoint_dir = './MAIN/RL_training_checkpoints/E' + str(EPOCHS) + 'B' + str(BATCH_SIZE)
+gan_checkpoint = './MNIST/AdvGANs_checkpoint/'
+checkpoint_dir = './MNIST/RL_training_checkpoints/E' + str(EPOCHS) + 'B' + str(BATCH_SIZE)
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                  discriminator_optimizer=discriminator_optimizer,
@@ -346,7 +346,7 @@ checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
 
 
 def generate_images(model,test_input,t,a,b):
-  images_dir = './MAIN/output images/E' + str(EPOCHS) + 'B' + str(BATCH_SIZE)
+  images_dir = './MNIST/output images/E' + str(EPOCHS) + 'B' + str(BATCH_SIZE)
   os.makedirs(images_dir, exist_ok=True)
   A=np.random.randint(40)
   target = target_images[A]
@@ -386,6 +386,29 @@ log_dir="logs/"
 
 summary_writer = tf.summary.create_file_writer(
   log_dir + "fit/" + datetime.datetime.now().strftime("%Y%m%d-%H%M%S"))
+
+
+
+
+
+def Accuracy():
+	test_dataset_1 = test_dataset.batch(BATCH_SIZE)
+	acc=0
+	for dataset in test_dataset1.take(10000/BATCH_SIZE):
+	  for target , t_target in target_dataset:
+	    data=dataset[0]
+	    t=dataset[1]
+	    action=actor([data,target])
+	    gen_output = generator(action, training=True)
+	    pred=target_model.predict(gen_output)
+	    correct_prediction = np.equal(np.argmax(pred, 1), np.argmax(t_target, 1))
+	    accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float64"))
+	    acc+=accuracy
+	    tf.print("Accuracy: ",accuracy)
+	tf.print("Mean Accuracy: ",(acc/10000)*BATCH_SIZE)
+
+
+
 
 @tf.function
 def train_step(dataset, target,epoch,target_model):
@@ -459,11 +482,19 @@ def fit(train_ds, target_ds, epochs, test_ds,target_model):
     
     # saving (checkpoint) the model every 2 epochs
     if (epoch + 1) % 2 == 0:
+      for input_image,t in test_dataset.take(100):
+        generate_images(generator, input_image,t,'test',X)
+        X+=1
+      X=0
       checkpoint.save(file_prefix = checkpoint_prefix)
-
+    if (epoch + 1) % 1 == 0:
+      Accuracy()
     print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1,
                                                         time.time()-start))
   checkpoint.save(file_prefix = checkpoint_prefix)
+
+
+
 
 checkpoint.restore(tf.train.latest_checkpoint(gan_checkpoint)).expect_partial()
 
@@ -479,17 +510,3 @@ for input_image,t in test_dataset.take(100):
 	generate_images(generator, input_image,t,'test',X)
 	X+=1
 
-test_dataset = test_dataset.batch(40)
-acc=0
-for dataset in test_dataset.take(100):
-  for target , t_target in target_dataset:
-    data=dataset[0]
-    t=dataset[1]
-    action=actor([data,target])
-    gen_output = generator(action, training=True)
-    pred=target_model.predict(gen_output)
-    correct_prediction = np.equal(np.argmax(pred, 1), np.argmax(t_target, 1))
-    accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float64"))
-    acc+=accuracy
-    tf.print("Accuracy: ",accuracy)
-tf.print("Mean Accuracy: ",acc/100)
