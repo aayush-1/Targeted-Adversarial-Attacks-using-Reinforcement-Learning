@@ -14,7 +14,7 @@ BATCH_SIZE = 40                                                         # change
 LAMBDA = 100
 X=0
 
-EPOCHS = 3
+EPOCHS = 40
 
 MEMORY = deque(maxlen=10000)
 
@@ -43,7 +43,7 @@ test_labels = tf.keras.utils.to_categorical(test_labels, 10)
 test_dataset=tf.data.Dataset.from_tensor_slices((test_dataset,test_labels))
 # test_dataset = test_dataset.batch(BATCH_SIZE)
 
-target_images=np.load("label.npy")
+target_images=np.load("./MNIST/label.npy")
 target_label = np.arange(10)
 target_label=np.float32(target_label)
 
@@ -487,7 +487,7 @@ def fit(train_ds, target_ds, epochs, test_ds,target_model):
         X+=1
       X=0
       checkpoint.save(file_prefix = checkpoint_prefix)
-    if (epoch + 1) % 1 == 0:
+    if (epoch + 1) % 20 == 0:
       Accuracy()
     print ('Time taken for epoch {} is {} sec\n'.format(epoch + 1,
                                                         time.time()-start))
