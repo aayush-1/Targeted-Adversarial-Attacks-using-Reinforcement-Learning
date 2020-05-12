@@ -23,7 +23,7 @@ X=0
 EPOCHS = 20
 
 
-target_model=tf.keras.models.load_model('Resnet_Target_Model.h5')
+target_model=tf.keras.models.load_model('Resnet_Target_Model_1.h5')
 
 
 (train_dataset, train_labels), (test_dataset, test_labels) = tf.keras.datasets.cifar10.load_data()
