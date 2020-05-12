@@ -1,3 +1,9 @@
+#!git clone https://github.com/iSarmad/RL-GAN-Net.git
+# from google.colab import drive                                                                                                                                                                        
+# drive.mount('/content/gdrive')
+# %cd gdrive/My\ Drive/RL\ Project/CIFAR
+
+# !ls
 import tensorflow as tf
 import os
 import time
@@ -10,21 +16,19 @@ import numpy as np
 
 
 BUFFER_SIZE = 60000
-BATCH_SIZE = 256
+BATCH_SIZE = 100
 LAMBDA = 100
 X=0
 
 EPOCHS = 20
 
 
+target_model=tf.keras.models.load_model('Resnet_Target_Model.h5')
 
 
-target_model=tf.keras.models.load_model('target_model')
+(train_dataset, train_labels), (test_dataset, test_labels) = tf.keras.datasets.cifar10.load_data()
 
-
-(train_dataset, train_labels), (test_dataset, test_labels) = tf.keras.datasets.mnist.load_data()
-
-train_dataset = train_dataset.reshape(train_dataset.shape[0], 28, 28, 1).astype('float32')
+train_dataset = train_dataset.reshape(train_dataset.shape[0], 32, 32, 3).astype('float32')
 train_dataset = (train_dataset - 127.5) / 127.5
 perm=np.random.permutation(train_dataset.shape[0])
 train_dataset=train_dataset[perm]
@@ -33,8 +37,7 @@ train_labels = tf.keras.utils.to_categorical(train_labels, 10)
 train_dataset=tf.data.Dataset.from_tensor_slices((train_dataset,train_labels))
 train_dataset = train_dataset.batch(BATCH_SIZE)
 
-
-test_dataset = test_dataset.reshape(test_dataset.shape[0], 28, 28, 1).astype('float32')
+test_dataset = test_dataset.reshape(test_dataset.shape[0], 32, 32, 3).astype('float32')
 test_dataset = (test_dataset - 127.5) / 127.5
 perm=np.random.permutation(test_dataset.shape[0])
 test_dataset=test_dataset[perm]
@@ -53,7 +56,7 @@ test_dataset=tf.data.Dataset.from_tensor_slices((test_dataset,test_labels))
 
 
 
-OUTPUT_CHANNELS = 1
+OUTPUT_CHANNELS = 3
 
 def downsample(filters, size, stride=2, apply_batchnorm=True):
   initializer = tf.random_normal_initializer(0., 0.02)
@@ -98,7 +101,7 @@ def upsample(filters, size, stride=2, apply_dropout=False):
 # print (up_result.shape)
 
 def Generator():
-  inputs = tf.keras.layers.Input(shape=[28,28,1])
+  inputs = tf.keras.layers.Input(shape=[32,32,3])
 
   down_stack = [
     downsample(64, 4, apply_batchnorm=False), # (bs, 128, 128, 64)
@@ -158,16 +161,15 @@ tf.keras.utils.plot_model(generator, to_file='generator.png',show_shapes=True, d
   * The [paper](https://arxiv.org/abs/1611.07004) also includes L1 loss which is MAE (mean absolute error) between the generated image and the target image.
   * This allows the generated image to become structurally similar to the target image.
   * The formula to calculate the total generator loss = gan_loss + LAMBDA * l1_loss, where LAMBDA = 100. This value was decided by the authors of the [paper](https://arxiv.org/abs/1611.07004).
-
 The training procedure for the generator is shown below:
 """
 
 def adv_loss(preds, labels, is_targeted):
-	real = tf.math.reduce_sum(labels * preds, 1)
-	other = tf.math.reduce_max((1 - labels) * preds - (labels * 10000), 1)
-	if is_targeted:
-		return tf.math.reduce_sum(tf.math.maximum(0.0, other - real))
-	return tf.math.reduce_sum(tf.maximum(0.0, real - other))
+  real = tf.math.reduce_sum(labels * preds, 1)
+  other = tf.math.reduce_max((1 - labels) * preds - (labels * 10000), 1)
+  if is_targeted:
+    return tf.math.reduce_sum(tf.math.maximum(0.0, other - real))
+  return tf.math.reduce_sum(tf.maximum(0.0, real - other))
 
 
 def generator_loss(disc_generated_output, gen_output, target,pred,label):
@@ -182,7 +184,6 @@ def generator_loss(disc_generated_output, gen_output, target,pred,label):
   return total_gan_loss, gan_loss, l1_loss,l_adv
 
 """![Generator Update Image](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/generative/images/gen.png?raw=1)
-
 ## Build the Discriminator
   * The Discriminator is a PatchGAN.
   * Each block in the discriminator is (Conv -> BatchNorm -> Leaky ReLU)
@@ -197,7 +198,7 @@ def generator_loss(disc_generated_output, gen_output, target,pred,label):
 def Discriminator():
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
-                                     input_shape=[28, 28, 1]))
+                                     input_shape=[32, 32, 3]))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Dropout(0.3))
 
@@ -240,17 +241,14 @@ def discriminator_loss(disc_real_output, disc_generated_output):
 
 
 """The training procedure for the discriminator is shown below.
-
 To learn more about the architecture and the hyperparameters you can refer the [paper](https://arxiv.org/abs/1611.07004).
-
 ![Discriminator Update Image](https://github.com/tensorflow/docs/blob/master/site/en/tutorials/generative/images/dis.png?raw=1)
-
 ## Define the Optimizers and Checkpoint-saver
 """
 generator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 discriminator_optimizer = tf.keras.optimizers.Adam(2e-4, beta_1=0.5)
 
-checkpoint_dir = './training_checkpoints'
+checkpoint_dir = './training_checkpoints_ResNet_Cifar10'
 checkpoint_prefix = os.path.join(checkpoint_dir, "ckpt")
 checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                  discriminator_optimizer=discriminator_optimizer,
@@ -258,13 +256,10 @@ checkpoint = tf.train.Checkpoint(generator_optimizer=generator_optimizer,
                                  discriminator=discriminator)
 
 """## Generate Images
-
 Write a function to plot some images during training.
-
 * We pass images from the test dataset to the generator.
 * The generator will then translate the input image into the output.
 * Last step is to plot the predictions and **voila!**
-
 Note: The `training=True` is intentional here since
 we want the batch statistics while running the model
 on the test dataset. If we use training=False, we will get
@@ -273,7 +268,7 @@ the accumulated statistics learned from the training dataset
 """
 
 def generate_images(model,test_input,t,a,b):
-  test_input=tf.reshape(test_input,[1,28,28,1])
+  test_input=tf.reshape(test_input,[1,32,32,3])
   prediction = model(test_input, training=True)
   pred_fake=np.argmax(target_model.predict(prediction))
   pred_orig=np.argmax(target_model.predict(test_input))
@@ -290,7 +285,7 @@ def generate_images(model,test_input,t,a,b):
     plt.subplot(1, 2, i+1)
     plt.title(title[i])
     # getting the pixel values between [0, 1] to plot it.
-    plt.imshow(tf.reshape(display_list[i],[28,28]) * 0.5 + 0.5)
+    plt.imshow(tf.reshape(display_list[i],[32,32,3]) * 0.5 + 0.5)
     plt.axis('off')
   if(a=='train'):
     plt.savefig('output_images/train_'+str(b)+'.png')
@@ -298,10 +293,9 @@ def generate_images(model,test_input,t,a,b):
     plt.savefig('output_images/test_'+str(b)+'.png')
 
 # for example_input in test_dataset.take(1):
-# 	generate_images(generator, example_input)
+#   generate_images(generator, example_input)
 
 """## Training
-
 * For each example input generate an output.
 * The discriminator receives the input_image and the generated image as the first input. The second input is the input_image and the target_image.
 * Next, we calculate the generator and the discriminator loss.
@@ -326,9 +320,10 @@ def train_step(dataset, epoch,target_model):
     disc_real_output = discriminator(input_image, training=True)
     disc_generated_output = discriminator( gen_output, training=True)
     pred=gen_output
-    for layer in target_model.layers:
-    	pred = layer(pred)
-    # pred=target_model.predict(gen_output,steps=1)
+
+    # for layer in target_model.layers:
+    #   pred = layer(pred)
+    pred=target_model.predict(pred)
     # (loss, accuracy)=target_model.evaluate(gen_output, t, batch_size = 128, verbose = 1,steps=1)
     correct_prediction = tf.math.equal(tf.math.argmax(pred, 1), tf.math.argmax(t, 1))
     accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float"))
@@ -349,7 +344,6 @@ def train_step(dataset, epoch,target_model):
 
 
 """The actual training loop:
-
 * Iterates over the number of epochs.
 * On each epoch it clears the display, and runs `generate_images` to show it's progress.
 * On each epoch it iterates over the training dataset, printing a '.' for each example.
@@ -399,5 +393,6 @@ checkpoint.restore(tf.train.latest_checkpoint(checkpoint_dir))
 
 # Run the trained model on a few examples from the test dataset
 for input_image,t in test_dataset.take(100):
-	generate_images(generator, input_image,t,'test',X)
-	X+=1
+  generate_images(generator, input_image,t,'test',X)
+  X+=1
+
