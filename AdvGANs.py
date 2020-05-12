@@ -17,14 +17,12 @@ X=0
 EPOCHS = 20
 
 
+target_model=tf.keras.models.load_model('Resnet_Target_Model.h5')
 
 
-target_model=tf.keras.models.load_model('target_model')
+(train_dataset, train_labels), (test_dataset, test_labels) = tf.keras.datasets.cifar10.load_data()
 
-
-(train_dataset, train_labels), (test_dataset, test_labels) = tf.keras.datasets.mnist.load_data()
-
-train_dataset = train_dataset.reshape(train_dataset.shape[0], 28, 28, 1).astype('float32')
+train_dataset = train_dataset.reshape(train_dataset.shape[0], 32, 32, 1).astype('float32')
 train_dataset = (train_dataset - 127.5) / 127.5
 perm=np.random.permutation(train_dataset.shape[0])
 train_dataset=train_dataset[perm]
@@ -33,8 +31,7 @@ train_labels = tf.keras.utils.to_categorical(train_labels, 10)
 train_dataset=tf.data.Dataset.from_tensor_slices((train_dataset,train_labels))
 train_dataset = train_dataset.batch(BATCH_SIZE)
 
-
-test_dataset = test_dataset.reshape(test_dataset.shape[0], 28, 28, 1).astype('float32')
+test_dataset = test_dataset.reshape(test_dataset.shape[0], 32, 32, 1).astype('float32')
 test_dataset = (test_dataset - 127.5) / 127.5
 perm=np.random.permutation(test_dataset.shape[0])
 test_dataset=test_dataset[perm]
@@ -98,7 +95,7 @@ def upsample(filters, size, stride=2, apply_dropout=False):
 # print (up_result.shape)
 
 def Generator():
-  inputs = tf.keras.layers.Input(shape=[28,28,1])
+  inputs = tf.keras.layers.Input(shape=[32,32,1])
 
   down_stack = [
     downsample(64, 4, apply_batchnorm=False), # (bs, 128, 128, 64)
@@ -197,7 +194,7 @@ def generator_loss(disc_generated_output, gen_output, target,pred,label):
 def Discriminator():
     model = tf.keras.Sequential()
     model.add(tf.keras.layers.Conv2D(64, (5, 5), strides=(2, 2), padding='same',
-                                     input_shape=[28, 28, 1]))
+                                     input_shape=[32, 32, 1]))
     model.add(tf.keras.layers.LeakyReLU())
     model.add(tf.keras.layers.Dropout(0.3))
 
@@ -273,7 +270,7 @@ the accumulated statistics learned from the training dataset
 """
 
 def generate_images(model,test_input,t,a,b):
-  test_input=tf.reshape(test_input,[1,28,28,1])
+  test_input=tf.reshape(test_input,[1,32,32,1])
   prediction = model(test_input, training=True)
   pred_fake=np.argmax(target_model.predict(prediction))
   pred_orig=np.argmax(target_model.predict(test_input))
@@ -290,7 +287,7 @@ def generate_images(model,test_input,t,a,b):
     plt.subplot(1, 2, i+1)
     plt.title(title[i])
     # getting the pixel values between [0, 1] to plot it.
-    plt.imshow(tf.reshape(display_list[i],[28,28]) * 0.5 + 0.5)
+    plt.imshow(tf.reshape(display_list[i],[32,32]) * 0.5 + 0.5)
     plt.axis('off')
   if(a=='train'):
     plt.savefig('output_images/train_'+str(b)+'.png')
