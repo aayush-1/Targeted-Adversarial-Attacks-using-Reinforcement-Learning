@@ -321,9 +321,9 @@ def train_step(dataset, epoch,target_model):
     disc_generated_output = discriminator( gen_output, training=True)
     pred=gen_output
 
-    # for layer in target_model.layers:
-    #   pred = layer(pred)
-    pred=target_model.predict(pred)
+    for layer in target_model.layers:
+      pred = layer(pred)
+    # pred=target_model.predict(pred)
     # (loss, accuracy)=target_model.evaluate(gen_output, t, batch_size = 128, verbose = 1,steps=1)
     correct_prediction = tf.math.equal(tf.math.argmax(pred, 1), tf.math.argmax(t, 1))
     accuracy = tf.math.reduce_mean(tf.cast(correct_prediction, "float"))
